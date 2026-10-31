@@ -1,11 +1,12 @@
 """
-Centro de Comando · Reconocimiento de imagen
---------------------------------------------
+Observatorio de imágenes
+------------------------
 App de Streamlit que envía una imagen a un modelo de visión de OpenAI y
-muestra el informe de análisis en tiempo real. Misma estética de base de
-comando espacial que la app de telemetría MQTT.
+muestra la descripción en tiempo real. Tema: observatorio astronómico, con
+un planeta anillado, órbitas de fondo y paleta inspirada en Neptuno,
+Saturno y Marte.
 
-Ejecutar:  streamlit run app_imagen.py
+Ejecutar:  streamlit run app_observatorio.py
 """
 
 import base64
@@ -29,8 +30,8 @@ PROMPT_BASE = "Describe en español lo que ves en la imagen."
 # ═════════════════════════════════════════════════════════════════════════════
 def configurar_pagina() -> None:
     st.set_page_config(
-        page_title="Centro de Comando · Imagen",
-        page_icon="🛰️",
+        page_title="Observatorio de imágenes",
+        page_icon="🪐",
         layout="centered",
         initial_sidebar_state="expanded",
     )
@@ -40,231 +41,216 @@ def inyectar_estilos() -> None:
     st.markdown(
         """
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
 
         :root {
-            --espacio:    #050914;
-            --panel:      rgba(11, 22, 44, 0.78);
-            --cian:       #35E0F2;
-            --cian-tenue: rgba(53, 224, 242, 0.28);
-            --violeta:    #8B5CF6;
-            --texto:      #D6E6F5;
-            --apagado:    #7F96B2;
-            --alerta:     #FF5C6C;
-            --campo:      #0A1529;
+            --noche:     #0D1230;
+            --panel:     rgba(23, 31, 72, 0.72);
+            --campo:     #11183B;
+            --oro:       #E9C46A;
+            --oro-claro: #F3DDA3;
+            --oro-tenue: rgba(233, 196, 106, 0.30);
+            --neptuno:   #5B8DEF;
+            --marte:     #F0705A;
+            --texto:     #EDE6D6;
+            --apagado:   #A3A9C9;
         }
 
-        /* ── Fondo: nebulosa + campo de estrellas ───── */
+        /* ── Fondo: noche azul + órbitas ────────────── */
         .stApp {
             background:
-                radial-gradient(ellipse at 15% 0%, rgba(139, 92, 246, .28), transparent 55%),
-                radial-gradient(ellipse at 95% 35%, rgba(53, 224, 242, .13), transparent 50%),
-                radial-gradient(ellipse at 40% 100%, rgba(255, 79, 216, .10), transparent 55%),
-                var(--espacio);
+                radial-gradient(ellipse at 100% 0%, rgba(91, 141, 239, .28), transparent 55%),
+                radial-gradient(ellipse at 0% 100%, rgba(233, 196, 106, .10), transparent 50%),
+                var(--noche);
             color: var(--texto);
-            font-family: 'Rajdhani', sans-serif;
+            font-family: 'Hanken Grotesk', sans-serif;
         }
         .stApp::before, .stApp::after {
             content: ""; position: fixed; inset: 0;
             pointer-events: none; z-index: 0;
         }
+        /* órbitas concéntricas que nacen de la esquina superior derecha */
         .stApp::before {
-            background-image:
-                radial-gradient(1px 1px at 20px 30px, #fff, transparent),
-                radial-gradient(1px 1px at 90px 140px, #cfe8ff, transparent),
-                radial-gradient(1.5px 1.5px at 160px 70px, #fff, transparent),
-                radial-gradient(1px 1px at 230px 190px, #b9d4ff, transparent);
-            background-size: 260px 220px;
-            opacity: .55;
+            background: repeating-radial-gradient(
+                circle at 108% -8%,
+                transparent 0 170px,
+                rgba(233, 196, 106, .08) 170px 171px);
         }
+        /* estrellas dispersas */
         .stApp::after {
             background-image:
-                radial-gradient(1px 1px at 60px 90px, #fff, transparent),
-                radial-gradient(1.5px 1.5px at 190px 20px, #ffe9ff, transparent),
-                radial-gradient(1px 1px at 120px 200px, #fff, transparent);
-            background-size: 340px 280px;
-            animation: titilar 7s ease-in-out infinite alternate;
+                radial-gradient(1px 1px at 30px 50px, #fff, transparent),
+                radial-gradient(1.5px 1.5px at 170px 120px, #dfe8ff, transparent),
+                radial-gradient(1px 1px at 280px 220px, #fff, transparent);
+            background-size: 320px 260px;
+            opacity: .4;
         }
-        @keyframes titilar { from { opacity: .2; } to { opacity: .75; } }
 
         [data-testid="stHeader"] { background: transparent; }
         .block-container {
             position: relative; z-index: 1;
-            padding-top: 2.5rem; max-width: 780px;
+            padding-top: 2.5rem; max-width: 760px;
         }
 
         /* ── Texto base ─────────────────────────────── */
         .stApp p, .stApp li, .stApp label, .stApp h1, .stApp h2, .stApp h3,
         [data-testid="stWidgetLabel"] p, summary p {
             color: var(--texto) !important;
-            font-family: 'Rajdhani', sans-serif;
-            font-size: 1.05rem;
+            font-family: 'Hanken Grotesk', sans-serif;
+            font-size: 1.02rem;
         }
         .stApp h2, .stApp h3 {
-            font-family: 'Orbitron', sans-serif !important;
-            font-size: 1.05rem !important;
-            letter-spacing: .12em;
-            text-transform: uppercase;
+            font-family: 'Fraunces', serif !important;
+            font-weight: 700 !important;
+            font-size: 1.35rem !important;
+            letter-spacing: -0.01em;
         }
         [data-testid="stCaptionContainer"] p {
-            color: var(--apagado) !important; font-size: .95rem;
+            color: var(--apagado) !important; font-size: .92rem;
         }
 
-        /* ── Encabezado con radar ───────────────────── */
-        .encabezado { display: flex; align-items: center; gap: 1.2rem; }
-        .radar {
-            flex: none; width: 66px; height: 66px; border-radius: 50%;
-            position: relative; overflow: hidden;
-            border: 1px solid var(--cian);
-            background: repeating-radial-gradient(
-                circle, transparent 0 9px, rgba(53, 224, 242, .22) 9px 10px);
-            box-shadow: 0 0 20px rgba(53, 224, 242, .4),
-                        inset 0 0 14px rgba(53, 224, 242, .25);
+        /* ── Encabezado con planeta anillado ────────── */
+        .encabezado { display: flex; align-items: center; gap: 1.3rem; }
+        .planeta { position: relative; flex: none; width: 92px; height: 92px; }
+        .planeta .esfera {
+            position: absolute; inset: 20px; border-radius: 50%; z-index: 1;
+            background:
+                radial-gradient(circle at 30% 26%, rgba(255,255,255,.38), transparent 42%),
+                linear-gradient(#E9C46A 0 18%, #C99A4B 18% 32%, #F3DDA3 32% 40%,
+                                #B97E3F 40% 58%, #E9C46A 58% 72%, #C99A4B 72% 100%);
+            box-shadow: inset -12px -10px 18px rgba(8, 10, 32, .62),
+                        0 0 26px rgba(233, 196, 106, .28);
         }
-        .radar::before {
-            content: ""; position: absolute; inset: 0; border-radius: 50%;
-            background: conic-gradient(
-                from 0deg, rgba(53, 224, 242, .6), transparent 30%);
-            animation: barrido 4s linear infinite;
+        .planeta .anillo {
+            position: absolute; left: 0; right: 0; top: 50%;
+            height: 30px; margin-top: -15px; border-radius: 50%;
+            border: 3px solid rgba(243, 221, 163, .9);
+            box-shadow: inset 0 0 0 5px rgba(233, 196, 106, .18);
+            transform: rotate(-18deg);
         }
-        .radar::after {
-            content: ""; position: absolute; top: 17px; left: 41px;
-            width: 4px; height: 4px; border-radius: 50%;
-            background: #fff; box-shadow: 0 0 6px #fff;
-        }
-        @keyframes barrido { to { transform: rotate(360deg); } }
+        .planeta .atras  { z-index: 0; }
+        .planeta .frente { z-index: 2; clip-path: inset(50% 0 0 0); }
 
         .titulo {
-            font-family: 'Orbitron', sans-serif; font-weight: 900;
-            font-size: 1.9rem; letter-spacing: .1em; text-transform: uppercase;
-            color: #fff; margin: 0; line-height: 1.1;
-            text-shadow: 0 0 18px rgba(53, 224, 242, .65);
+            font-family: 'Fraunces', serif; font-weight: 700;
+            font-size: 2.15rem; line-height: 1.1; letter-spacing: -0.02em;
+            color: var(--texto); margin: 0;
         }
         .subtitulo {
-            color: var(--apagado); font-size: 1.1rem; font-weight: 500;
-            letter-spacing: .04em; margin: .25rem 0 0 0;
+            color: var(--apagado); font-size: 1.08rem; margin: .35rem 0 0 0;
         }
 
-        /* ── Indicador de enlace ────────────────────── */
-        .enlace {
+        /* ── Indicador de clave ─────────────────────── */
+        .estado-clave {
             display: inline-flex; align-items: center; gap: .6rem;
-            margin: 1.4rem 0 .4rem 0; padding: .4rem 1rem;
-            background: var(--panel); border: 1px solid var(--cian-tenue);
-            font-weight: 600; letter-spacing: .06em; color: var(--texto);
-            clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px,
-                               100% 100%, 10px 100%, 0 calc(100% - 10px));
+            margin: 1.4rem 0 .4rem 0; padding: .35rem 1rem;
+            background: var(--panel); border: 1px solid var(--oro-tenue);
+            border-radius: 999px; font-weight: 600; color: var(--texto);
         }
-        .enlace .estado { color: var(--apagado); }
-        .punto {
-            width: 9px; height: 9px; border-radius: 50%;
-            background: var(--apagado);
-        }
-        .punto.activo {
-            background: #3DFFB0; box-shadow: 0 0 10px #3DFFB0;
-            animation: pulso 1.8s ease-in-out infinite;
-        }
-        .punto.error { background: var(--alerta); box-shadow: 0 0 10px var(--alerta); }
-        @keyframes pulso { 50% { opacity: .35; } }
+        .estado-clave .detalle { color: var(--apagado); font-weight: 500; }
+        .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--apagado); }
+        .punto.activo { background: var(--oro); box-shadow: 0 0 10px var(--oro); }
 
         /* ── Carga de imagen ────────────────────────── */
         [data-testid="stFileUploaderDropzone"] {
             background: var(--panel);
-            border: 1.5px dashed var(--cian-tenue); border-radius: 2px;
+            border: 1.5px dashed var(--oro-tenue); border-radius: 18px;
         }
-        [data-testid="stFileUploaderDropzone"]:hover { border-color: var(--cian); }
+        [data-testid="stFileUploaderDropzone"]:hover { border-color: var(--oro); }
         [data-testid="stFileUploaderDropzone"] small,
         [data-testid="stFileUploaderDropzone"] span {
             color: var(--apagado) !important;
         }
         [data-testid="stFileUploaderDropzone"] button {
-            background: transparent; border: 1px solid var(--cian);
-            color: var(--cian); border-radius: 2px;
+            background: transparent; border: 1px solid var(--oro);
+            color: var(--oro); border-radius: 999px;
         }
-        [data-testid="stImage"] img { border: 1px solid var(--cian-tenue); }
+        /* la vista previa se ve como la mira de un telescopio */
+        [data-testid="stImage"] img {
+            border: 1px solid var(--oro);
+            border-radius: 16px;
+            outline: 1px solid var(--oro-tenue);
+            outline-offset: 7px;
+        }
         [data-testid="stImageCaption"] { color: var(--apagado) !important; }
 
         /* ── Campos de texto ────────────────────────── */
         [data-baseweb="input"], [data-baseweb="base-input"],
         [data-baseweb="textarea"] {
             background: var(--campo) !important;
-            border-color: var(--cian-tenue) !important;
-            border-radius: 2px !important;
+            border-color: var(--oro-tenue) !important;
+            border-radius: 12px !important;
         }
         [data-baseweb="input"] input, [data-baseweb="base-input"] input,
         [data-baseweb="textarea"] textarea {
             color: var(--texto) !important; background: var(--campo) !important;
-            font-family: 'Rajdhani', sans-serif; font-size: 1.05rem;
+            font-family: 'Hanken Grotesk', sans-serif; font-size: 1.02rem;
         }
         [data-baseweb="input"]:focus-within, [data-baseweb="textarea"]:focus-within {
-            border-color: var(--cian) !important;
-            box-shadow: 0 0 10px rgba(53, 224, 242, .4);
+            border-color: var(--oro) !important;
+            box-shadow: 0 0 0 3px rgba(233, 196, 106, .22);
         }
 
-        /* ── Informe de análisis ────────────────────── */
+        /* ── Informe: franja de bandas tipo Júpiter ─── */
         [data-testid="stVerticalBlockBorderWrapper"] {
-            background: linear-gradient(160deg,
-                rgba(18, 36, 70, .85), rgba(7, 14, 30, .92));
-            border: 1px solid var(--cian-tenue) !important;
-            border-radius: 2px !important;
-            box-shadow: inset 0 0 28px rgba(53, 224, 242, .07);
+            background: linear-gradient(165deg,
+                rgba(28, 38, 86, .88), rgba(13, 18, 48, .94));
+            border: 1px solid var(--oro-tenue) !important;
+            border-radius: 18px !important;
+            overflow: hidden;
+        }
+        [data-testid="stVerticalBlockBorderWrapper"]::before {
+            content: ""; display: block; height: 8px;
+            background: linear-gradient(#E9C46A 0 25%, #B97E3F 25% 50%,
+                                        #F3DDA3 50% 62%, #C99A4B 62% 100%);
         }
 
-        /* ── Sin señal / falla ──────────────────────── */
+        /* ── Sin informe / falla ────────────────────── */
         .vacio, .falla {
             padding: 2rem 1.5rem; text-align: center;
-            color: var(--apagado); font-size: 1.1rem;
-            background: var(--panel); border: 1px dashed var(--cian-tenue);
+            color: var(--apagado); font-size: 1.05rem;
+            background: var(--panel); border: 1.5px dashed var(--oro-tenue);
+            border-radius: 18px;
         }
         .vacio strong, .falla strong {
-            display: block; margin-bottom: .35rem;
-            font-family: 'Orbitron', sans-serif; letter-spacing: .12em;
-            text-transform: uppercase; font-size: 1rem; color: var(--texto);
+            display: block; margin-bottom: .3rem;
+            font-family: 'Fraunces', serif; font-size: 1.2rem; color: var(--texto);
         }
-        .falla { border: 1px solid rgba(255, 92, 108, .55);
-                 background: rgba(255, 92, 108, .08); }
-        .falla strong { color: var(--alerta); }
+        .falla { border: 1px solid rgba(240, 112, 90, .6);
+                 background: rgba(240, 112, 90, .08); }
+        .falla strong { color: var(--marte); }
 
-        /* ── Botón principal ────────────────────────── */
+        /* ── Botón principal: oro de Saturno ────────── */
         .stButton > button {
-            background: linear-gradient(90deg,
-                rgba(53, 224, 242, .18), rgba(139, 92, 246, .32));
-            border: 1px solid var(--cian); border-radius: 2px;
-            padding: .85rem 1rem;
-            box-shadow: 0 0 18px rgba(53, 224, 242, .25);
-            transition: box-shadow .2s ease, background .2s ease;
+            background: linear-gradient(135deg, #F3DDA3, #E9C46A 55%, #C99A4B);
+            border: none; border-radius: 999px; padding: .8rem 1rem;
+            box-shadow: 0 6px 22px rgba(233, 196, 106, .28);
+            transition: transform .15s ease, box-shadow .15s ease;
         }
         .stButton > button p {
-            color: #E8FBFF !important;
-            font-family: 'Orbitron', sans-serif; font-weight: 700;
-            letter-spacing: .16em; text-transform: uppercase;
-            font-size: .95rem;
+            color: #1A1535 !important;
+            font-family: 'Hanken Grotesk', sans-serif;
+            font-weight: 700; font-size: 1.08rem; letter-spacing: .01em;
         }
         .stButton > button:hover {
-            border-color: #fff;
-            background: linear-gradient(90deg,
-                rgba(53, 224, 242, .32), rgba(139, 92, 246, .5));
-            box-shadow: 0 0 28px rgba(53, 224, 242, .55);
+            transform: translateY(-1px);
+            box-shadow: 0 10px 28px rgba(233, 196, 106, .42);
         }
-        .stButton > button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+        .stButton > button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 
         /* ── Barra lateral, expanders y avisos ──────── */
         section[data-testid="stSidebar"] {
-            background: rgba(5, 10, 22, .96);
-            border-right: 1px solid var(--cian-tenue);
+            background: #0A0E27; border-right: 1px solid var(--oro-tenue);
         }
         [data-testid="stExpander"] {
-            background: var(--panel); border: 1px solid var(--cian-tenue);
-            border-radius: 2px;
+            background: var(--panel); border: 1px solid var(--oro-tenue);
+            border-radius: 14px;
         }
         [data-testid="stAlert"] {
-            background: rgba(53, 224, 242, .07);
-            border: 1px solid var(--cian-tenue); border-radius: 2px;
+            background: rgba(233, 196, 106, .08);
+            border: 1px solid var(--oro-tenue); border-radius: 12px;
         }
-        [data-testid="stSpinner"] p { color: var(--cian) !important; }
-
-        @media (prefers-reduced-motion: reduce) {
-            .radar::before, .stApp::after, .punto.activo { animation: none; }
-        }
+        [data-testid="stSpinner"] p { color: var(--oro) !important; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -328,7 +314,7 @@ def transmitir_analisis(api_key: str, prompt: str, data_url: str):
 def render_sidebar() -> str:
     """Dibuja la barra lateral y devuelve la clave de API."""
     with st.sidebar:
-        st.subheader("Credenciales")
+        st.subheader("Acceso")
         api_key = st.text_input(
             "Clave de OpenAI",
             type="password",
@@ -343,10 +329,14 @@ def render_encabezado(api_key: str) -> None:
     st.markdown(
         """
         <div class="encabezado">
-            <div class="radar"></div>
+            <div class="planeta">
+                <div class="anillo atras"></div>
+                <div class="esfera"></div>
+                <div class="anillo frente"></div>
+            </div>
             <div>
-                <h1 class="titulo">Centro de comando</h1>
-                <div class="subtitulo">Reconocimiento de imagen con inteligencia artificial</div>
+                <h1 class="titulo">Observatorio de imágenes</h1>
+                <div class="subtitulo">Apunta a una imagen y recibe una descripción detallada.</div>
             </div>
         </div>
         """,
@@ -356,10 +346,10 @@ def render_encabezado(api_key: str) -> None:
     clase, texto = ("activo", "Clave lista") if api_key else ("", "Falta la clave")
     st.markdown(
         f"""
-        <div class="enlace">
+        <div class="estado-clave">
             <span class="punto {clase}"></span>
             <span>{MODELO}</span>
-            <span class="estado">{texto}</span>
+            <span class="detalle">{texto}</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -368,7 +358,7 @@ def render_encabezado(api_key: str) -> None:
 
 def render_carga():
     """Panel de carga de imagen. Devuelve el archivo subido (o None)."""
-    st.subheader("Carga de imagen")
+    st.subheader("Muestra")
     archivo = st.file_uploader(
         "Sube una imagen para analizar",
         type=TIPOS_IMAGEN,
@@ -382,8 +372,8 @@ def render_carga():
 
 def render_consulta() -> str:
     """Panel de consulta opcional. Devuelve el contexto escrito."""
-    st.subheader("Consulta")
-    quiere_detalle = st.toggle("Preguntar algo específico sobre la imagen", value=False)
+    st.subheader("Pregunta")
+    quiere_detalle = st.toggle("Hacer una pregunta específica sobre la imagen", value=False)
     if not quiere_detalle:
         return ""
     return st.text_area(
@@ -396,8 +386,8 @@ def render_estado_vacio() -> None:
     st.markdown(
         """
         <div class="vacio">
-            <strong>Sin informe</strong>
-            Sube una imagen y pulsa «Iniciar análisis» para recibir la descripción.
+            <strong>Aún no hay observaciones</strong>
+            Sube una imagen y pulsa «Observar imagen» para recibir la descripción.
         </div>
         """,
         unsafe_allow_html=True,
@@ -408,7 +398,7 @@ def render_falla(mensaje: str) -> None:
     st.markdown(
         f"""
         <div class="falla">
-            <strong>No se pudo completar el análisis</strong>
+            <strong>No se pudo completar la observación</strong>
             {escape(mensaje)}
         </div>
         """,
@@ -428,12 +418,12 @@ def ejecutar_analisis(api_key: str, archivo, contexto: str) -> None:
     st.session_state.informe = None
     st.session_state.error = None
 
-    st.subheader("Informe de análisis")
+    st.subheader("Observaciones")
     with st.container(border=True):
         espacio = st.empty()
         texto = ""
         try:
-            with st.spinner("Analizando imagen…"):
+            with st.spinner("Observando la imagen…"):
                 prompt = construir_prompt(contexto)
                 for fragmento in transmitir_analisis(
                     api_key, prompt, codificar_imagen(archivo)
@@ -450,7 +440,7 @@ def ejecutar_analisis(api_key: str, archivo, contexto: str) -> None:
 
 def render_resultado_guardado() -> None:
     """Muestra el último informe (o error) cuando no se está analizando."""
-    st.subheader("Informe de análisis")
+    st.subheader("Observaciones")
     if st.session_state.error:
         render_falla(st.session_state.error)
     elif st.session_state.informe:
@@ -476,10 +466,10 @@ def main() -> None:
     contexto = render_consulta()
     st.write("")
 
-    analizar = st.button("Iniciar análisis", use_container_width=True, type="primary")
+    observar = st.button("Observar imagen", use_container_width=True, type="primary")
     st.write("")
 
-    if analizar:
+    if observar:
         ejecutar_analisis(api_key, archivo, contexto)
     else:
         render_resultado_guardado()
